@@ -1,29 +1,17 @@
 package com.example.customlist2;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.recyclerview.widget.RecyclerView;
-
-import android.Manifest;
-import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -33,14 +21,11 @@ import java.util.List;
 import java.util.Random;
 
 public class MainActivity extends AppCompatActivity {
-
     private Random random = new Random();
     private ItemAdapter itemAdapter;
     private List<Drawable> images = new ArrayList<>();
     private ListView listView;
-    private File logFile ;
-    private File file;
-
+    private File logFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,9 +34,13 @@ public class MainActivity extends AppCompatActivity {
 
         FloatingActionButton fab = findViewById(R.id.floatingActionButton);
         listView = findViewById(R.id.listViewMain);
-        logFile = new File (getApplicationContext().getExternalFilesDir(null), "homework.txt");
+        logFile = new File(getApplicationContext().getExternalFilesDir(null), "idkwid.txt");
 
         dropImages();
+
+        itemAdapter = new ItemAdapter(this, null);
+
+        readItems();
 
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -60,7 +49,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        itemAdapter = new ItemAdapter(this, null);
         listView.setAdapter(itemAdapter);
 
         listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
@@ -82,42 +70,60 @@ public class MainActivity extends AppCompatActivity {
         ItemData itemData = new ItemData(
                 images.get(random.nextInt(images.size())),
                 "Hello" + itemAdapter.getCount(),
-                "It\'s me"
+                "It's me"
         );
         itemAdapter.addItem(itemData);
 
-        FileWriter writer = null;
-        file = new File(itemData.toString());
-        {
-            try {
-                writer = new FileWriter(logFile, true);
-                writer.append(file + ";");
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                try {
-                    writer.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+        try (FileWriter writer = new FileWriter(logFile, true)) {
+            saveItem(writer, itemData);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+    }
 
+    private void saveItem(FileWriter writer, ItemData itemData) throws IOException {
+        writer.append(itemData.getTitle());
+        writer.append(";");
+        writer.append(itemData.getSubtitle());
+        writer.append(";");
+        writer.append(String.valueOf(images.indexOf(itemData.getImage())));
+        writer.append(";");
+    }
+
+    private void readItems() {
+        try (BufferedReader reader = new BufferedReader(new FileReader(logFile))) {
+            String[] split = reader.readLine().split(";");
+            for (int i = 0 ; i < split.length; i += 3) { // почему i+=3 ???
+                String title = split[i];
+                String subtitle = split[i + 1];
+                Drawable image = images.get(Integer.parseInt(split[i + 2]));
+                itemAdapter.addItem(new ItemData(image, title, subtitle));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void showInfo(int position) {
         ItemData itemData = (ItemData) itemAdapter.getItem(position);
         Toast.makeText(MainActivity.this,
                 "Title: " + itemData.getTitle() + "\n" +
-                        "Subtitle: " + itemData.getSubtitle() ,
+                        "Subtitle: " + itemData.getSubtitle(),
                 Toast.LENGTH_SHORT).show();
     }
 
-    public void delete(View v){
+    public void delete(View v) {
         int position = listView.getPositionForView(v);
         itemAdapter.removeItem(position);
-        File files = new File(v.toString() + ";");
-        files.delete();
-    }
 
+        logFile.delete();
+
+        try (FileWriter writer = new FileWriter(logFile, true)) {
+            for (int i = 0; i < itemAdapter.getCount(); i++) {
+                saveItem(writer, (ItemData) itemAdapter.getItem(i));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
